@@ -1,0 +1,126 @@
+
+***************************************************************************************************
+*                                                                                                 *
+* Subject: Validating Kubernetes Cluster Installed using Kubeadm | Kubeadm                        *
+*                                                                                                 *
+* Author: Srinath Challa | Kubernetes SME | Udemy                                                 *
+*                                                                                                 *
+* Created On: Feb 2021                                                                            *
+*                                                                                                 *
+* Connect me on:                                                                                  *    
+* --------------                                                                                  *
+* https://www.udemy.com/user/srinathchalla/                                                       *
+* https://www.linkedin.com/in/srinathchalla/                                                      *
+* https://www.youtube.com/srinathchalla                                                           *
+*                                                                                                 *
+* Reference:                                                                                      *
+* ----------                                                                                      *
+* https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/          *
+* https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/   *
+* https://kubernetes.io/docs/setup/production-environment/container-runtimes/#docker              *
+*                                                                                                 *
+***************************************************************************************************
+
+In this demo:
+~~~~~~~~~~~~~
+
+a. We will validate the K8s cluster configured using kubeadm in the previous lecture.
+
+b. At the end, we will deploy same deployment and will ensure everything is working as it should be.
+
+
+***************************************************************************************************
+
+1. Validating CMD Tools:  kubeadm & kubectl:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ensure kubeadm and kubectl version is as per your cluster setup
+
+1a). Checking "kubeadm" version:
+--------------------------------
+kubeadm version
+
+1b). Checking "kubectl" version:
+--------------------------------
+kubectl version
+
+
+***************************************************************************************************
+
+
+2. Validating Cluster Nodes:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ensure all nodes including Master and Worker nodes are "Ready":
+---------------------------------------------------------------
+kubectl get nodes 
+kubectl get nodes –o wide
+
+
+***************************************************************************************************
+
+
+3. Validating Kubernetes Components:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ensure all K8s Master node components are in "Running" status:
+--------------------------------------------------------------
+kubectl get pods –n kube-system
+kubectl get pods –n kube-system -o wide
+
+
+***************************************************************************************************
+
+
+4. Validating Services:  Docker & Kubelet:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ensure Docker and Kubelet Services are "Active(Running) and Enabled on all nodes
+
+4a). Checking Docker Service Status:
+------------------------------------
+systemctl status docker
+
+4b). Checking Docker Kubelet Status:
+------------------------------------
+systemctl status kubelet
+
+
+***************************************************************************************************
+
+
+5. Deploying Test Deployment:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+5a). Deploying the sample "nginx" deployment:
+----------------------------------------
+kubectl apply -f https://k8s.io/examples/controllers/nginx-deployment.yaml
+
+5b). Validate Deployment:
+-------------------------
+kubectl get deploy
+kubectl get deploy –o wide
+
+5c). Validating Pods are in "Running" status:
+---------------------------------------------
+kubectl get pods 
+kubectl get pods –o wide
+
+5d). Validate containers are running on respective worker nodes:
+----------------------------------------------------------------
+docker ps
+
+5e). Delete Deployment:
+-----------------------
+kubectl delete -f https://k8s.io/examples/controllers/nginx-deployment.yaml
+
+
+***************************************************************************************************
+
+
+
+
+
+
+
+
