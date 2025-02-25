@@ -1,6 +1,7 @@
-# 🚀 Kubernetes Hands-On Lab on macOS for CKA Preparation (Vagrant with VMware Fusion)
+# Kezie Iroha
+# Kubernetes Hands-On Lab on macOS for CKA Preparation (Vagrant with VMware Fusion)
 
-## ✅ Key Engineering Goals
+## Key Engineering Goals
 - **Real-world Kubernetes setup** (not `kind`, not minikube).
 - **Multi-node cluster** (1 Control Plane, 2 Workers for practical setup).
 - **Uses `kubeadm`** (just like in production).
@@ -16,7 +17,7 @@
 
 ---
 
-## 1️⃣ Install Prerequisites on macOS
+## 1️ Install Prerequisites on macOS
 ```sh
 # Install Vagrant & VMware Fusion
 brew install vagrant
@@ -31,7 +32,7 @@ brew install kubectl helm kubectx stern jq yq
 
 ---
 
-## 2️⃣ Create Kubernetes Cluster Using Vagrant
+## 2️ Create Kubernetes Cluster Using Vagrant
 
 ### Step 1: Create a `Vagrantfile`
 ```ruby
@@ -262,7 +263,7 @@ kubectl get pods -n kube-flannel
 
 ---
 
-## 3️⃣ Verify Network Connectivity
+## 3️ Verify Network Connectivity
 
 ### Test Pod-to-Pod Communication
 ```sh
@@ -282,7 +283,7 @@ kubectl exec busybox -- wget -O- http://nginx
 
 ---
 
-## 4️⃣ Install Additional Components
+## 4️ Install Additional Components
 
 ### Step 1: Install NGINX Ingress Controller
 ```sh
@@ -332,7 +333,7 @@ helm install prometheus prometheus-community/kube-prometheus-stack --namespace m
 
 ---
 
-## 5️⃣ Install GitOps with ArgoCD
+## 5️ Install GitOps with ArgoCD
 ```sh
 helm repo add argo https://argoproj.github.io/argo-helm
 helm install argo-cd argo/argo-cd --namespace argocd --create-namespace
@@ -340,7 +341,7 @@ helm install argo-cd argo/argo-cd --namespace argocd --create-namespace
 
 ---
 
-## 6️⃣ Install Storage with Rook-Ceph
+## 6️ Install Storage with Rook-Ceph
 ```sh
 kubectl create -f https://raw.githubusercontent.com/rook/rook/master/deploy/examples/crds.yaml
 kubectl create -f https://raw.githubusercontent.com/rook/rook/master/deploy/examples/common.yaml
@@ -352,14 +353,14 @@ kubectl create -f https://raw.githubusercontent.com/rook/rook/master/deploy/exam
 
 ---
 
-## 7️⃣ Install OPA/Gatekeeper for Policy Enforcement
+## 7️ Install OPA/Gatekeeper for Policy Enforcement
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/master/deploy/gatekeeper.yaml
 ```
 
 ---
 
-## 8️⃣ Troubleshooting Guide
+## 8️ Troubleshooting Guide
 
 ### Check Node Status
 ```sh
@@ -406,7 +407,7 @@ kubectl -n kube-system exec -it etcd-k8s-master -- etcdctl \
 
 ---
 
-## 9️⃣ CKA Practice Exercises
+## 9️ CKA Practice Exercises
 
 ### RBAC Configuration
 ```sh
@@ -438,4 +439,3 @@ EOF
 kubectl label namespace default pod-security.kubernetes.io/enforce=baseline
 ```
 
-This lab environment provides hands-on experience with all the key components tested in the CKA exam, using Flannel for networking which is simpler and more reliable for virtualized environments.

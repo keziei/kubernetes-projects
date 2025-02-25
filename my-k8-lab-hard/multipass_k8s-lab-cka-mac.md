@@ -1,6 +1,7 @@
-# 🚀 Kubernetes Hands-On Lab on macOS for CKA Preparation
+# Kezie Iroha
+# Kubernetes Hands-On Lab on macOS for CKA Preparation
 
-## ✅ Key Engineering Goals
+## Key Engineering Goals
 - **Real-world Kubernetes setup** (not `kind`, not minikube).
 - **Multi-node cluster** (1 Master, 1 Worker).
 - **Uses `kubeadm`** (just like in production).
@@ -14,7 +15,7 @@
 
 ---
 
-## 1️⃣ Install Prerequisites on macOS
+## 1 Install Prerequisites on macOS
 ```sh
 # Install Rancher Desktop
 brew install --cask rancher
@@ -28,7 +29,7 @@ brew install kubectl helm kubectx stern jq yq
 
 ---
 
-## 2️⃣ Create Kubernetes Nodes Using Multipass
+## 2️ Create Kubernetes Nodes Using Multipass
 We'll use Multipass to create two VMs:  
 ✅ `k8s-master` (Control Plane)  
 ✅ `k8s-worker1` (Worker Node)
@@ -48,7 +49,7 @@ multipass list
 
 ---
 
-## 3️⃣ Configure Master Node
+## 3️ Configure Master Node
 ### Step 1: Access the Master Node
 ```sh
 multipass shell k8s-master
@@ -82,7 +83,7 @@ sudo apt-mark hold kubelet kubeadm kubectl
 sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 ```
 
-✅ **After initialization, set up `kubectl` access:**
+**After initialization, set up `kubectl` access:**
 ```sh
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
@@ -94,14 +95,14 @@ Verify:
 kubectl get nodes
 ```
 
-✅ **Step 5: Install Calico CNI**
+ **Step 5: Install Calico CNI**
 ```sh
 kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
 ```
 
 ---
 
-## 4️⃣ Configure Worker Node
+## 4️ Configure Worker Node
 ### Step 1: Get Join Command on Master
 ```sh
 kubeadm token create --print-join-command
@@ -142,7 +143,7 @@ kubectl get nodes
 
 ---
 
-## 5️⃣ Install Core Kubernetes Tools
+## 5️ Install Core Kubernetes Tools
 ### Install Metrics Server
 ```sh
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
@@ -164,7 +165,7 @@ helm install fluentd fluent/fluentd
 
 ---
 
-## 6️⃣ Install Ingress Controller
+## 6️ Install Ingress Controller
 ```sh
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm install ingress-nginx ingress-nginx/ingress-nginx
@@ -172,7 +173,7 @@ helm install ingress-nginx ingress-nginx/ingress-nginx
 
 ---
 
-## 7️⃣ Storage (PVs & PVCs)
+## 7️ Storage (PVs & PVCs)
 ```sh
 kubectl apply -f - <<EOF
 apiVersion: v1
@@ -190,7 +191,7 @@ EOF
 
 ---
 
-## 8️⃣ Security (RBAC & Network Policies)
+## 8️ Security (RBAC & Network Policies)
 ```sh
 kubectl apply -f - <<EOF
 apiVersion: rbac.authorization.k8s.io/v1
@@ -222,7 +223,7 @@ EOF
 
 ---
 
-## 9️⃣ Troubleshooting (Critical for CKA)
+## 9️ Troubleshooting (Critical for CKA)
 ```sh
 # Check logs of failing pods
 kubectl describe pod <pod-name>

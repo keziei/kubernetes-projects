@@ -3,7 +3,7 @@
 *                                                                                                 *
 * Subject: Validating Kubernetes Cluster Installed using Kubeadm | Kubeadm                        *
 *                                                                                                 *
-* Author: Srinath Challa | Kubernetes SME | Udemy                                                 *
+* Author: Srinath Challa | Kubernetes SME | Udemy Course                                                 *
 *                                                                                                 *
 * Created On: Feb 2021                                                                            *
 *                                                                                                 *

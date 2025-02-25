@@ -1,5 +1,4 @@
-
-
+# Kezie Iroha
 # Kubernetes Setup the Hard Way (Manual Configuration Steps)
 
 ## Phase 1: Create Virtual Machines
@@ -269,5 +268,3 @@ spec:
   - first-pool
 EOF
 ```
-
-By following these manual steps, you'll gain a deeper understanding of how each component of a Kubernetes cluster is configured and how they interact with each other, which is valuable knowledge for the CKA exam.

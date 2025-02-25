@@ -1,6 +1,7 @@
-# 🚀 Kubernetes Hands-On Lab on macOS for CKA Preparation (VMware Fusion)
+# Kezie Iroha
+# Kubernetes Hands-On Lab on macOS for CKA Preparation (VMware Fusion)
 
-## ✅ Key Engineering Goals
+##  Key Engineering Goals
 - **Real-world Kubernetes setup** (not `kind`, not minikube).
 - **Multi-node cluster** (3 Control Planes, 2 Workers for HA Setup).
 - **Uses `kubeadm`** (just like in production).
@@ -16,7 +17,7 @@
 
 ---
 
-## 1️⃣ Install Prerequisites on macOS
+## 1️ Install Prerequisites on macOS
 ```sh
 # Install VMware Fusion
 # Ensure VMware Fusion is installed and licensed
@@ -27,7 +28,7 @@ brew install kubectl helm kubectx stern jq yq
 
 ---
 
-## 2️⃣ Create High-Availability Kubernetes Cluster Using VMware Fusion
+## 2️ Create High-Availability Kubernetes Cluster Using VMware Fusion
 
 ### Get the IP Address of Each VM
 To retrieve the IP address of a VM in VMware Fusion, run:
@@ -59,7 +60,7 @@ sudo yum install -y open-vm-tools
 
 ---
 
-## 3️⃣ Configure Control Plane Nodes
+## 3️ Configure Control Plane Nodes
 
 ### Step 1: Install Container Runtime (`containerd`)
 ```sh
@@ -120,7 +121,7 @@ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/m
 
 ---
 
-## 4️⃣ Configure Worker Nodes
+## 4️ Configure Worker Nodes
 
 ### Step 1: Get Join Command on Master
 ```sh
@@ -147,7 +148,7 @@ kubectl get nodes
 
 ---
 
-## 5️⃣ Install GitOps with ArgoCD
+## 5️ Install GitOps with ArgoCD
 ```sh
 helm repo add argo https://argoproj.github.io/argo-helm
 helm install argo-cd argo/argo-cd --namespace argocd --create-namespace
@@ -155,7 +156,7 @@ helm install argo-cd argo/argo-cd --namespace argocd --create-namespace
 
 ---
 
-## 6️⃣ Install Cluster Autoscaler
+## 6️ Install Cluster Autoscaler
 ```sh
 helm repo add autoscaler https://kubernetes.github.io/autoscaler
 helm install cluster-autoscaler autoscaler/cluster-autoscaler
@@ -163,7 +164,7 @@ helm install cluster-autoscaler autoscaler/cluster-autoscaler
 
 ---
 
-## 7️⃣ Install Rook-Ceph for Dynamic Storage
+## 7️ Install Rook-Ceph for Dynamic Storage
 ```sh
 helm repo add rook-release https://charts.rook.io/release
 helm install rook-ceph rook-release/rook-ceph
@@ -171,7 +172,7 @@ helm install rook-ceph rook-release/rook-ceph
 
 ---
 
-## 8️⃣ Install OPA/Gatekeeper for Policy Enforcement
+## 8️ Install OPA/Gatekeeper for Policy Enforcement
 ```sh
 helm repo add gatekeeper https://open-policy-agent.github.io/gatekeeper/charts
 helm install gatekeeper gatekeeper/gatekeeper
@@ -179,7 +180,7 @@ helm install gatekeeper gatekeeper/gatekeeper
 
 ---
 
-## 9️⃣ Troubleshooting Enhancements
+## 9️ Troubleshooting Enhancements
 ```sh
 # Simulate control plane failure
 sudo systemctl stop kube-apiserver
