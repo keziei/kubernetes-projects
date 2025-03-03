@@ -433,7 +433,7 @@ One of your worker nodes has become unresponsive and is not accepting new pod de
 > - [Troubleshooting Clusters](https://kubernetes.io/docs/tasks/debug/debug-cluster/)
 
 ### Fault Injection
-Execute on worker1:
+Execute on k8s-worker1:
 ```bash
 # Corrupt kubelet configuration
 sudo mv /etc/kubernetes/kubelet.conf /etc/kubernetes/kubelet.conf.bak
@@ -445,22 +445,22 @@ sudo systemctl restart kubelet
 1. Check the status of nodes:
    ```bash
    kubectl get nodes
-   # The worker1 node will show as NotReady
+   # The k8s-worker1 node will show as NotReady
    ```
 
 2. Examine pods affected by the node failure:
    ```bash
-   kubectl get pods --all-namespaces -o wide | grep worker1
+   kubectl get pods --all-namespaces -o wide | grep k8s-worker1
    ```
 
 3. Check node description for events:
    ```bash
-   kubectl describe node worker1
+   kubectl describe node k8s-worker1
    ```
 
 4. SSH to the problematic node and check kubelet status:
    ```bash
-   ssh worker1
+   ssh k8s-worker1
    sudo systemctl status kubelet
    sudo journalctl -u kubelet | tail -n 50
    ```
@@ -471,7 +471,7 @@ sudo systemctl restart kubelet
    ```
 
 ### Remediation
-1. Restore kubelet configuration on worker1:
+1. Restore kubelet configuration on k8s-worker1:
    ```bash
    sudo mv /etc/kubernetes/kubelet.conf.bak /etc/kubernetes/kubelet.conf
    sudo systemctl restart kubelet
@@ -479,12 +479,12 @@ sudo systemctl restart kubelet
 
 2. If node recovery isn't possible, safely drain the node:
    ```bash
-   kubectl drain worker1 --ignore-daemonsets --delete-emptydir-data
+   kubectl drain k8s-worker1 --ignore-daemonsets --delete-emptydir-data
    ```
 
 3. If the node is permanently unavailable, remove it from the cluster:
    ```bash
-   kubectl delete node worker1
+   kubectl delete node k8s-worker1
    ```
 
 4. Check pod rescheduling to other nodes:
@@ -495,7 +495,7 @@ sudo systemctl restart kubelet
 5. Verify node recovery:
    ```bash
    kubectl get nodes
-   # worker1 should show as Ready
+   # k8s-worker1 should show as Ready
    ```
 
 ### Do Not Forget (Key Takeaways)
@@ -1005,9 +1005,9 @@ Simulate a problematic upgrade scenario:
 kubectl create deployment important-app --image=nginx --replicas=3
 kubectl create service clusterip important-app --tcp=80:80
 
-# Simulate component version mismatch on worker2
-ssh worker2 "sudo sed -i 's/v1.31/v1.30/' /etc/kubernetes/kubelet.conf"
-ssh worker2 "sudo systemctl restart kubelet"
+# Simulate component version mismatch on k8s-worker2
+ssh k8s-worker2 "sudo sed -i 's/v1.31/v1.30/' /etc/kubernetes/kubelet.conf"
+ssh k8s-worker2 "sudo systemctl restart kubelet"
 
 # On master, prepare for kubelet upgrade but introduce error
 ssh k8s-master "sudo mv /etc/systemd/system/kubelet.service.d/10-kubeadm.conf /etc/systemd/system/kubelet.service.d/10-kubeadm.conf.bak"
@@ -1023,14 +1023,14 @@ ssh k8s-master "sudo mv /etc/systemd/system/kubelet.service.d/10-kubeadm.conf /e
 2. Check node status:
    ```bash
    kubectl get nodes
-   kubectl describe node worker2
+   kubectl describe node k8s-worker2
    ```
 
-3. Check kubelet configuration on worker2:
+3. Check kubelet configuration on k8s-worker2:
    ```bash
-   ssh worker2 "sudo systemctl status kubelet"
-   ssh worker2 "sudo journalctl -u kubelet | tail -n 50"
-   ssh worker2 "sudo cat /etc/kubernetes/kubelet.conf"
+   ssh k8s-worker2 "sudo systemctl status kubelet"
+   ssh k8s-worker2 "sudo journalctl -u kubelet | tail -n 50"
+   ssh k8s-worker2 "sudo cat /etc/kubernetes/kubelet.conf"
    ```
 
 4. Check the kubelet service configuration on master:
@@ -1040,10 +1040,10 @@ ssh k8s-master "sudo mv /etc/systemd/system/kubelet.service.d/10-kubeadm.conf /e
    ```
 
 ### Remediation
-1. Fix kubelet configuration on worker2:
+1. Fix kubelet configuration on k8s-worker2:
    ```bash
-   ssh worker2 "sudo sed -i 's/v1.30/v1.32/' /etc/kubernetes/kubelet.conf"
-   ssh worker2 "sudo systemctl restart kubelet"
+   ssh k8s-worker2 "sudo sed -i 's/v1.30/v1.32/' /etc/kubernetes/kubelet.conf"
+   ssh k8s-worker2 "sudo systemctl restart kubelet"
    ```
 
 2. Restore kubelet service configuration on master:
@@ -1064,19 +1064,19 @@ ssh k8s-master "sudo mv /etc/systemd/system/kubelet.service.d/10-kubeadm.conf /e
    ssh k8s-master "sudo systemctl restart kubelet"
    
    # Upgrade worker nodes one at a time
-   # For worker1
-   kubectl drain worker1 --ignore-daemonsets
-   ssh worker1 "sudo kubeadm upgrade node"
-   ssh worker1 "sudo dnf upgrade -y kubelet"
-   ssh worker1 "sudo systemctl restart kubelet"
-   kubectl uncordon worker1
+   # For k8s-worker1
+   kubectl drain k8s-worker1 --ignore-daemonsets
+   ssh k8s-worker1 "sudo kubeadm upgrade node"
+   ssh k8s-worker1 "sudo dnf upgrade -y kubelet"
+   ssh k8s-worker1 "sudo systemctl restart kubelet"
+   kubectl uncordon k8s-worker1
    
-   # For worker2
-   kubectl drain worker2 --ignore-daemonsets
-   ssh worker2 "sudo kubeadm upgrade node"
-   ssh worker2 "sudo dnf upgrade -y kubelet"
-   ssh worker2 "sudo systemctl restart kubelet"
-   kubectl uncordon worker2
+   # For k8s-worker2
+   kubectl drain k8s-worker2 --ignore-daemonsets
+   ssh k8s-worker2 "sudo kubeadm upgrade node"
+   ssh k8s-worker2 "sudo dnf upgrade -y kubelet"
+   ssh k8s-worker2 "sudo systemctl restart kubelet"
+   kubectl uncordon k8s-worker2
    ```
 
 4. Verify the upgrade:
@@ -1153,13 +1153,13 @@ spec:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - worker1
+          - k8s-worker1
 EOF
 
 kubectl apply -f /tmp/local-pv.yaml
 
-# Create directory on worker1 with incorrect permissions
-ssh worker1 "sudo mkdir -p /mnt/data && sudo chmod 700 /mnt/data"
+# Create directory on k8s-worker1 with incorrect permissions
+ssh k8s-worker1 "sudo mkdir -p /mnt/data && sudo chmod 700 /mnt/data"
 
 # Create a stateful application that requires storage
 cat <<EOF > /tmp/stateful-app.yaml
@@ -1276,48 +1276,48 @@ When troubleshooting storage problems in Kubernetes, remember to check OS-level 
 1. **SELinux issues**:
    ```bash
    # Check if SELinux is enforcing
-   ssh worker1 sudo getenforce
+   ssh k8s-worker1 sudo getenforce
    # If it returns "Enforcing", it might be blocking volume access
    
    # Temporarily set to permissive for testing
-   ssh worker1 sudo setenforce 0
+   ssh k8s-worker1 sudo setenforce 0
    
    # For a permanent fix, create the correct SELinux context
-   ssh worker1 sudo chcon -Rt svirt_sandbox_file_t /mnt/data
+   ssh k8s-worker1 sudo chcon -Rt svirt_sandbox_file_t /mnt/data
    
    # For RHEL/AlmaLinux environments, check contexts more thoroughly
-   ssh worker1 "sudo ls -lZ /mnt/data"
+   ssh k8s-worker1 "sudo ls -lZ /mnt/data"
    
    # Apply the container file context policy
-   ssh worker1 "sudo semanage fcontext -a -t container_file_t '/mnt/data(/.*)?'"
-   ssh worker1 "sudo restorecon -Rv /mnt/data"
+   ssh k8s-worker1 "sudo semanage fcontext -a -t container_file_t '/mnt/data(/.*)?'"
+   ssh k8s-worker1 "sudo restorecon -Rv /mnt/data"
    ```
 
 2. **Directory permissions**:
    ```bash
    # Check directory permissions
-   ssh worker1 ls -la /mnt/data
+   ssh k8s-worker1 ls -la /mnt/data
    
    # Fix permissions if needed - typical container UIDs need read/write
-   ssh worker1 sudo chmod 755 /mnt/data
+   ssh k8s-worker1 sudo chmod 755 /mnt/data
    ```
 
 3. **AppArmor/SecComp profiles** (if enabled):
    ```bash
    # Check if profiles are loaded
-   ssh worker1 sudo aa-status
+   ssh k8s-worker1 sudo aa-status
    
    # Check Docker/containerd configuration for default profiles
-   ssh worker1 cat /etc/docker/daemon.json
+   ssh k8s-worker1 cat /etc/docker/daemon.json
    ```
 
 4. **Disk space issues**:
    ```bash
    # Check available disk space
-   ssh worker1 df -h
+   ssh k8s-worker1 df -h
    
    # Check inode usage (sometimes overlooked)
-   ssh worker1 df -i
+   ssh k8s-worker1 df -i
    ```
 
 These OS-level checks are especially important for local storage provisioners.
@@ -1348,7 +1348,7 @@ These OS-level checks are especially important for local storage provisioners.
            - key: kubernetes.io/hostname
              operator: In
              values:
-             - worker1
+             - k8s-worker1
    EOF
    
    kubectl apply -f /tmp/fixed-local-pv.yaml
@@ -1356,8 +1356,8 @@ These OS-level checks are especially important for local storage provisioners.
 
 2. Fix directory permissions on the worker node:
    ```bash
-   ssh worker1 "sudo chmod 755 /mnt/data"
-   ssh worker1 "sudo chown 999:999 /mnt/data"  # 999 is the postgres user in the container
+   ssh k8s-worker1 "sudo chmod 755 /mnt/data"
+   ssh k8s-worker1 "sudo chown 999:999 /mnt/data"  # 999 is the postgres user in the container
    ```
 
 3. Delete the pod to trigger recreation with correct storage:
@@ -1405,10 +1405,10 @@ When troubleshooting PV/PVC issues:
 For SELinux environments, check context:
 ```bash
 # Check SELinux status
-ssh worker1 "getenforce"
+ssh k8s-worker1 "getenforce"
 
 # Add correct SELinux context
-ssh worker1 "sudo chcon -Rt svirt_sandbox_file_t /mnt/data"
+ssh k8s-worker1 "sudo chcon -Rt svirt_sandbox_file_t /mnt/data"
 ```
 
 For more details, see: [Kubernetes Volumes documentation](https://kubernetes.io/docs/concepts/storage/volumes/)
@@ -1644,11 +1644,11 @@ A high-priority application needs to be scheduled with specific node placement r
 ### Fault Injection
 Set up a cluster with taints and scheduling constraints:
 ```bash
-# Taint worker1 to repel regular workloads
-kubectl taint nodes worker1 dedicated=high-priority:NoSchedule
+# Taint k8s-worker1 to repel regular workloads
+kubectl taint nodes k8s-worker1 dedicated=high-priority:NoSchedule
 
-# Taint worker2 with a taint that has no matching toleration
-kubectl taint nodes worker2 environment=production:NoSchedule
+# Taint k8s-worker2 with a taint that has no matching toleration
+kubectl taint nodes k8s-worker2 environment=production:NoSchedule
 
 # Create a deployment without proper tolerations
 cat <<EOF > /tmp/priority-app.yaml
@@ -1720,8 +1720,8 @@ kubectl apply -f /tmp/regular-app.yaml
 
 2. Check node taints:
    ```bash
-   kubectl describe nodes worker1 | grep Taint
-   kubectl describe nodes worker2 | grep Taint
+   kubectl describe nodes k8s-worker1 | grep Taint
+   kubectl describe nodes k8s-worker2 | grep Taint
    ```
 
 3. Check why pods aren't scheduling:
@@ -1772,7 +1772,7 @@ kubectl apply -f /tmp/regular-app.yaml
                  - key: kubernetes.io/hostname
                    operator: In
                    values:
-                   - worker1
+                   - k8s-worker1
          containers:
          - name: app
            image: nginx
@@ -1791,7 +1791,7 @@ kubectl apply -f /tmp/regular-app.yaml
 2. Verify pod placement:
    ```bash
    kubectl get pods -l app=priority-app -o wide
-   # Pods should now be scheduled on worker1
+   # Pods should now be scheduled on k8s-worker1
    ```
 
 3. Add a pod anti-affinity to ensure high availability:
@@ -1852,7 +1852,7 @@ kubectl apply -f /tmp/regular-app.yaml
 4. Verify distribution across nodes:
    ```bash
    kubectl get pods -l app=priority-app -o wide
-   # Pods should be distributed across worker1 and worker2 for HA
+   # Pods should be distributed across k8s-worker1 and k8s-worker2 for HA
    ```
 
 ### Do Not Forget (Key Takeaways)
@@ -2227,7 +2227,7 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
    # |        ID        | STATUS  |  NAME  |         PEER ADDRS         |        CLIENT ADDRS        | IS LEARNER |
    # +------------------+---------+--------+----------------------------+----------------------------+------------+
    # | 8211f1d0f64f3269 | started | master | https://172.16.8.2:2380    | https://172.16.8.2:2379    |      false |
-   # | a3dea766690c24f0 | started | worker1| https://172.16.8.3:2380    | https://172.16.8.3:2379    |      false |
+   # | a3dea766690c24f0 | started | k8s-worker1| https://172.16.8.3:2380    | https://172.16.8.3:2379    |      false |
    # | f4ea13541bc89ce2 | unstarted | etcd-failed | https://192.168.100.100:2380 |                             |      false |
    # +------------------+---------+--------+----------------------------+----------------------------+------------+
    ```
@@ -2340,7 +2340,7 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
    # Member 2be1eb8f84fb7f63 added to cluster abc123def
    #
    # ETCD_NAME="etcd-new"
-   # ETCD_INITIAL_CLUSTER="master=https://172.16.8.2:2380,worker1=https://172.16.8.3:2380,etcd-new=https://192.168.1.10:2380"
+   # ETCD_INITIAL_CLUSTER="master=https://172.16.8.2:2380,k8s-worker1=https://172.16.8.3:2380,etcd-new=https://192.168.1.10:2380"
    # ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.1.10:2380"
    # ETCD_INITIAL_CLUSTER_STATE="existing"
    ```
@@ -2365,7 +2365,7 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
    Type=notify
    ExecStart=/usr/local/bin/etcd \\
      --name="etcd-new" \\
-     --initial-cluster="master=https://172.16.8.2:2380,worker1=https://172.16.8.3:2380,etcd-new=https://192.168.1.10:2380" \\
+     --initial-cluster="master=https://172.16.8.2:2380,k8s-worker1=https://172.16.8.3:2380,etcd-new=https://192.168.1.10:2380" \\
      --initial-cluster-state="existing" \\
      --initial-advertise-peer-urls="https://192.168.1.10:2380" \\
      --advertise-client-urls="https://192.168.1.10:2379" \\
@@ -2507,43 +2507,43 @@ The cluster's kubelets have failing TLS connections to the API server. Upon inve
 Set up a scenario with expired certificates:
 ```bash
 # First, backup the current certificate for reference
-ssh worker1 "sudo cp /var/lib/kubelet/pki/kubelet-client-current.pem /tmp/kubelet-client-backup.pem"
+ssh k8s-worker1 "sudo cp /var/lib/kubelet/pki/kubelet-client-current.pem /tmp/kubelet-client-backup.pem"
 
-# Create a short-lived certificate on worker1
-ssh worker1 "sudo kubeadm cert renew kubelet-client --config /tmp/kubeadm-config.yaml"
+# Create a short-lived certificate on k8s-worker1
+ssh k8s-worker1 "sudo kubeadm cert renew kubelet-client --config /tmp/kubeadm-config.yaml"
 
 # Artificially expire the certificate by modifying the timestamp
-ssh worker1 "sudo sed -i 's/NotAfter:/NotAfter: 210101000000Z # /' /var/lib/kubelet/pki/kubelet-client-current.pem"
+ssh k8s-worker1 "sudo sed -i 's/NotAfter:/NotAfter: 210101000000Z # /' /var/lib/kubelet/pki/kubelet-client-current.pem"
 
 # Restart kubelet to pick up the "expired" certificate
-ssh worker1 "sudo systemctl restart kubelet"
+ssh k8s-worker1 "sudo systemctl restart kubelet"
 ```
 
 ### Diagnostic Steps
 1. Check the node status and kubelet healthiness:
    ```bash
    kubectl get nodes
-   # worker1 will show as NotReady
+   # k8s-worker1 will show as NotReady
 
-   kubectl describe node worker1
+   kubectl describe node k8s-worker1
    # Look for conditions and errors related to kubelet communication
    ```
 
 2. Examine kubelet logs on the problematic node:
    ```bash
-   ssh worker1 "sudo journalctl -u kubelet | tail -n 50"
+   ssh k8s-worker1 "sudo journalctl -u kubelet | tail -n 50"
    # Look for TLS certificate errors
    ```
 
 3. Check certificate expiration:
    ```bash
-   ssh worker1 "sudo openssl x509 -in /var/lib/kubelet/pki/kubelet-client-current.pem -text -noout | grep -A2 Validity"
+   ssh k8s-worker1 "sudo openssl x509 -in /var/lib/kubelet/pki/kubelet-client-current.pem -text -noout | grep -A2 Validity"
    # Note the certificate validity period
    ```
 
 4. Check API server connection from worker node:
    ```bash
-   ssh worker1 "curl -v https://k8s-master:6443/healthz --cacert /etc/kubernetes/pki/ca.crt --cert /var/lib/kubelet/pki/kubelet-client-current.pem --key /var/lib/kubelet/pki/kubelet-client-current.pem"
+   ssh k8s-worker1 "curl -v https://k8s-master:6443/healthz --cacert /etc/kubernetes/pki/ca.crt --cert /var/lib/kubelet/pki/kubelet-client-current.pem --key /var/lib/kubelet/pki/kubelet-client-current.pem"
    # Should show TLS/certificate errors
    ```
 
@@ -2551,37 +2551,37 @@ ssh worker1 "sudo systemctl restart kubelet"
 1. Rotate the kubelet client certificate:
    ```bash
    # In a kubeadm-managed cluster, we can renew cert with kubeadm
-   ssh worker1 "sudo kubeadm cert renew kubelet-client"
+   ssh k8s-worker1 "sudo kubeadm cert renew kubelet-client"
    
    # Alternative manual approach (if needed):
-   ssh worker1 "sudo cp /tmp/kubelet-client-backup.pem /var/lib/kubelet/pki/kubelet-client-current.pem"
+   ssh k8s-worker1 "sudo cp /tmp/kubelet-client-backup.pem /var/lib/kubelet/pki/kubelet-client-current.pem"
    ```
 
 2. Restart kubelet to use the new certificate:
    ```bash
-   ssh worker1 "sudo systemctl restart kubelet"
+   ssh k8s-worker1 "sudo systemctl restart kubelet"
    ```
 
 3. Verify the node has rejoined the cluster:
    ```bash
    kubectl get nodes
-   # worker1 should show as Ready
+   # k8s-worker1 should show as Ready
    
    # Verify certificate validity
-   ssh worker1 "sudo openssl x509 -in /var/lib/kubelet/pki/kubelet-client-current.pem -text -noout | grep -A2 Validity"
+   ssh k8s-worker1 "sudo openssl x509 -in /var/lib/kubelet/pki/kubelet-client-current.pem -text -noout | grep -A2 Validity"
    ```
 
 4. Set up automatic certificate rotation for future renewals:
    ```bash
    # In Kubernetes 1.32, certificate rotation is enabled by default with advanced features
    # Check that the automatic rotation is functioning
-   ssh worker1 "sudo systemctl status kubelet | grep certificate-rotation"
+   ssh k8s-worker1 "sudo systemctl status kubelet | grep certificate-rotation"
    
    # If needed, verify the rotation settings in the kubelet configuration
-   ssh worker1 "sudo grep -A5 rotation /var/lib/kubelet/config.yaml"
+   ssh k8s-worker1 "sudo grep -A5 rotation /var/lib/kubelet/config.yaml"
    
    # Certificates should appear in the auto rotation list
-   ssh worker1 "sudo kubeadm certs check-expiration | grep kubelet-client"
+   ssh k8s-worker1 "sudo kubeadm certs check-expiration | grep kubelet-client"
    ```
 
 ### Do Not Forget (Key Takeaways)
@@ -2800,9 +2800,9 @@ echo "1. Breaking API server configuration..."
 sudo cp /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/kube-apiserver.yaml.bak
 sudo sed -i 's/--etcd-servers=/--etcd-servers=https:\/\/127.0.0.1:2380,/' /etc/kubernetes/manifests/kube-apiserver.yaml
 
-# Disrupt networking on worker1
-echo "2. Disrupting network on worker1..."
-ssh worker1 "sudo iptables -I INPUT -p tcp --dport 10250 -j DROP"
+# Disrupt networking on k8s-worker1
+echo "2. Disrupting network on k8s-worker1..."
+ssh k8s-worker1 "sudo iptables -I INPUT -p tcp --dport 10250 -j DROP"
 
 # Break RBAC for system:kube-scheduler
 echo "3. Breaking scheduler RBAC permissions..."
@@ -2846,7 +2846,7 @@ kubectl run heavy-app --image=nginx -n restricted-space --requests=cpu=500m,memo
 # Create a persistent volume with incorrect permissions
 echo "6. Creating broken PV/PVC configuration..."
 kubectl create namespace data-services
-ssh worker1 "sudo mkdir -p /mnt/data && sudo chmod 700 /mnt/data"
+ssh k8s-worker1 "sudo mkdir -p /mnt/data && sudo chmod 700 /mnt/data"
 cat <<EOT | kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolume
@@ -2948,8 +2948,8 @@ kubectl cluster diagnose
 
 # Check node health directly from each node
 ssh k8s-master "sudo k8s-node-health-check"
-ssh worker1 "sudo k8s-node-health-check"
-ssh worker2 "sudo k8s-node-health-check"
+ssh k8s-worker1 "sudo k8s-node-health-check"
+ssh k8s-worker2 "sudo k8s-node-health-check"
 # The integrated node health check tool provides status even when API server is unavailable
 ```
 
@@ -2979,10 +2979,10 @@ kubectl describe pods -n data-services
 
 #### 4. Check Network Connectivity
 ```bash
-# Test worker1 connectivity
-ssh worker1 "curl -k https://k8s-master:6443/healthz"
+# Test k8s-worker1 connectivity
+ssh k8s-worker1 "curl -k https://k8s-master:6443/healthz"
 # Check iptables rules
-ssh worker1 "sudo iptables -L -n"
+ssh k8s-worker1 "sudo iptables -L -n"
 ```
 
 #### 5. Check RBAC and Permissions
@@ -3009,10 +3009,10 @@ ssh k8s-master "sudo cp /tmp/kube-apiserver.yaml.bak /etc/kubernetes/manifests/k
 sleep 60
 ```
 
-#### 2. Fix Network Connectivity on worker1
+#### 2. Fix Network Connectivity on k8s-worker1
 ```bash
 # Remove the blocking iptables rule
-ssh worker1 "sudo iptables -D INPUT -p tcp --dport 10250 -j DROP"
+ssh k8s-worker1 "sudo iptables -D INPUT -p tcp --dport 10250 -j DROP"
 ```
 
 #### 3. Fix Scheduler RBAC Permissions
@@ -3034,7 +3034,7 @@ kubectl delete resourcequota compute-quota -n restricted-space
 #### 5. Fix PV/PVC Issues
 ```bash
 # Fix permissions on the storage path
-ssh worker1 "sudo chmod 755 /mnt/data"
+ssh k8s-worker1 "sudo chmod 755 /mnt/data"
 # Delete and recreate PV with correct access modes
 kubectl delete pv broken-pv
 cat <<EOF | kubectl apply -f -
@@ -3091,9 +3091,9 @@ Here is a step-by-step approach to resolving all issues in the combined mock exa
    - Fix: `sudo cp /tmp/kube-apiserver.yaml.bak /etc/kubernetes/manifests/kube-apiserver.yaml`
    - Validation: `kubectl get nodes` starts working after API server recovers
 
-2. **Network Connectivity on worker1**
+2. **Network Connectivity on k8s-worker1**
    - Diagnosis: Blocking iptables rule on port 10250 prevents kubelet communication
-   - Fix: `ssh worker1 "sudo iptables -D INPUT -p tcp --dport 10250 -j DROP"`
+   - Fix: `ssh k8s-worker1 "sudo iptables -D INPUT -p tcp --dport 10250 -j DROP"`
    - Validation: Worker node becomes Ready in `kubectl get nodes`
 
 3. **Scheduler RBAC Issues**
@@ -3338,48 +3338,48 @@ When troubleshooting storage problems in Kubernetes, remember to check OS-level 
 1. **SELinux issues**:
    ```bash
    # Check if SELinux is enforcing
-   ssh worker1 sudo getenforce
+   ssh k8s-worker1 sudo getenforce
    # If it returns "Enforcing", it might be blocking volume access
    
    # Temporarily set to permissive for testing
-   ssh worker1 sudo setenforce 0
+   ssh k8s-worker1 sudo setenforce 0
    
    # For a permanent fix, create the correct SELinux context
-   ssh worker1 sudo chcon -Rt svirt_sandbox_file_t /mnt/data
+   ssh k8s-worker1 sudo chcon -Rt svirt_sandbox_file_t /mnt/data
    
    # For RHEL/AlmaLinux environments, check contexts more thoroughly
-   ssh worker1 "sudo ls -lZ /mnt/data"
+   ssh k8s-worker1 "sudo ls -lZ /mnt/data"
    
    # Apply the container file context policy
-   ssh worker1 "sudo semanage fcontext -a -t container_file_t '/mnt/data(/.*)?'"
-   ssh worker1 "sudo restorecon -Rv /mnt/data"
+   ssh k8s-worker1 "sudo semanage fcontext -a -t container_file_t '/mnt/data(/.*)?'"
+   ssh k8s-worker1 "sudo restorecon -Rv /mnt/data"
    ```
 
 2. **Directory permissions**:
    ```bash
    # Check directory permissions
-   ssh worker1 ls -la /mnt/data
+   ssh k8s-worker1 ls -la /mnt/data
    
    # Fix permissions if needed - typical container UIDs need read/write
-   ssh worker1 sudo chmod 755 /mnt/data
+   ssh k8s-worker1 sudo chmod 755 /mnt/data
    ```
 
 3. **AppArmor/SecComp profiles** (if enabled):
    ```bash
    # Check if profiles are loaded
-   ssh worker1 sudo aa-status
+   ssh k8s-worker1 sudo aa-status
    
    # Check Docker/containerd configuration for default profiles
-   ssh worker1 cat /etc/docker/daemon.json
+   ssh k8s-worker1 cat /etc/docker/daemon.json
    ```
 
 4. **Disk space issues**:
    ```bash
    # Check available disk space
-   ssh worker1 df -h
+   ssh k8s-worker1 df -h
    
    # Check inode usage (sometimes overlooked)
-   ssh worker1 df -i
+   ssh k8s-worker1 df -i
    ```
 
 These OS-level checks are especially important for local storage provisioners.
