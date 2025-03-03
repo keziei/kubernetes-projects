@@ -1,5 +1,6 @@
-# Kezie Iroha
-### Note on Kubernetes 1.32 Features
+# Kezie Iroha 
+# CKA Exam Prep Notes and Scenarios
+# Based on Kubernetes 1.32 Features
 
 Kubernetes 1.32 introduces several new features and enhancements that improve cluster administration:
 
@@ -55,7 +56,22 @@ Kubernetes 1.32 introduces several new features and enhancements that improve cl
    ```
 
 These features are reflected in the scenarios to provide realistic preparation for the latest Kubernetes environments.   # 6. Check node status if pod scheduling issues
-   kubectl describe node <node-name>## Common Mistakes and Quick Fixes
+   kubectl describe node <node-name>### YAML Validation Tip
+
+When working with YAML manifests, always validate your syntax before applying:
+
+```bash
+# Validate YAML without applying
+kubectl apply --dry-run=client --validate=true -f your-manifest.yaml
+
+# For quick validation with multiple resources
+for file in *.yaml; do
+  echo "Validating $file..."
+  kubectl apply --dry-run=client --validate=true -f $file || echo "Error in $file"
+done
+```
+
+## Common Mistakes and Quick Fixes
 
 When practicing for the CKA exam, be aware of these common mistakes and their quick fixes:
 
@@ -117,7 +133,578 @@ k uncordon node
 k create clusterrolebinding cluster-admin-binding --clusterrole=cluster-admin --user=username
 ```
 
-## Helpful Resources
+### Do Not Forget (Key Takeaways)
+- ✅ For dynamic provisioning, ensure the StorageClass references a valid provisioner
+- ✅ Check provisioner pod logs for errors (`kubectl logs -n <namespace> <provisioner-pod>`)
+- ✅ For volume expansion, StorageClass must have `allowVolumeExpansion: true`
+- ✅ If using cloud providers, verify proper authentication for the CSI driver
+- ✅ If provisioning fails, see [Troubleshooting PersistentVolumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#troubleshooting)
+- ✅ For advanced storage topics, see [Scenario 8: Persistent Volume Troubleshooting](#scenario-8-persistent-volume-and-storage-troubleshooting)
+
+## Scenario 17: Advanced Debugging with Ephemeral Containers
+
+### Key Learning Objectives
+- Master advanced debugging techniques using ephemeral containers
+- Troubleshoot running pods without modifying their original definition
+- Diagnose complex networking and application issues
+- Understand when and how to use different debugging tools
+- Learn how to debug containers with minimal base images
+
+### Problem Statement
+Your team has deployed several microservices with minimal container images (distroless or scratch-based) that lack debugging tools. Users are reporting intermittent connectivity issues and performance problems. You need to diagnose these issues without disrupting the running applications or modifying their deployment definitions.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Pod                                                         │
+│                                                             │
+│  ┌─────────────────┐    ┌─────────────────────────────┐    │
+│  │                 │    │  Ephemeral Debug Container  │    │
+│  │  Application    │◄───│                             │    │
+│  │  Container      │    │  - Network tools            │    │
+│  │                 │    │  - Process monitoring       │    │
+│  │ (minimal image) │    │  - Filesystem inspection    │    │
+│  └─────────────────┘    └─────────────────────────────┘    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+> **Relevant Official Documentation**:
+> - [Debugging with Ephemeral Containers](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#ephemeral-container)
+> - [Using kubectl debug](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#debug)
+
+### Fault Injection
+Set up an environment with problematic pods:
+
+```bash
+# Create a namespace for our debugging scenarios
+kubectl create namespace debug-practice
+
+# Deploy an application using a minimal distroless image
+cat <<EOF > /tmp/minimal-app.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minimal-app
+  namespace: debug-practice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: minimal-app
+  template:
+    metadata:
+      labels:
+        app: minimal-app
+    spec:
+      containers:
+      - name: app
+        image: gcr.io/distroless/static-debian11
+        command: ["/busybox/sleep", "infinity"]
+        resources:
+          limits:
+            memory: "50Mi"
+            cpu: "100m"
+          requests:
+            memory: "25Mi"
+            cpu: "50m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minimal-service
+  namespace: debug-practice
+spec:
+  selector:
+    app: minimal-app
+  ports:
+  - port: 80
+    targetPort: 8080
+EOF
+
+kubectl apply -f /tmp/minimal-app.yaml
+
+# Deploy a second app that will communicate with the first
+cat <<EOF > /tmp/client-app.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-app
+  namespace: debug-practice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client
+  template:
+    metadata:
+      labels:
+        app: client
+    spec:
+      containers:
+      - name: client
+        image: busybox:1.28
+        command: ["/bin/sh", "-c", "while true; do wget -q -O- minimal-service || echo 'Failed'; sleep 5; done"]
+EOF
+
+kubectl apply -f /tmp/client-app.yaml
+
+# Create a NetworkPolicy that's too restrictive
+cat <<EOF > /tmp/restrictive-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: restrict-traffic
+  namespace: debug-practice
+spec:
+  podSelector:
+    matchLabels:
+      app: minimal-app
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          role: monitoring
+EOF
+
+kubectl apply -f /tmp/restrictive-policy.yaml
+
+# Inject high CPU usage in one pod
+POD=$(kubectl get pod -n debug-practice -l app=minimal-app -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n debug-practice $POD -- /busybox/sh -c "while true; do :; done" &
+```
+
+### Diagnostic Steps
+
+#### 1. Check the application status
+
+```bash
+# Check client pod logs to confirm connectivity issues
+CLIENT_POD=$(kubectl get pod -n debug-practice -l app=client -o jsonpath='{.items[0].metadata.name}')
+kubectl logs -n debug-practice $CLIENT_POD
+
+# Example output:
+# wget: can't connect to remote host minimal-service: Connection refused
+# Failed
+# wget: can't connect to remote host minimal-service: Connection refused
+# Failed
+```
+
+#### 2. Initial investigation of application pods
+
+```bash
+# Check pod status
+kubectl get pods -n debug-practice -o wide
+
+# Try to check logs of the minimal app
+APP_POD=$(kubectl get pod -n debug-practice -l app=minimal-app -o jsonpath='{.items[0].metadata.name}')
+kubectl logs -n debug-practice $APP_POD
+
+# Try to exec into the container (this will fail with distroless)
+kubectl exec -it -n debug-practice $APP_POD -- sh
+# Example output:
+# OCI runtime exec failed: exec failed: container_linux.go:380: starting container process caused: exec: "sh": executable file not found in $PATH: unknown
+```
+
+#### 3. Using ephemeral containers for network debugging
+
+```bash
+# Add a debug container to investigate network configuration
+kubectl debug -n debug-practice $APP_POD -it --image=nicolaka/netshoot --target=app
+
+# Inside the debug container:
+# Check if the application is listening on port 8080
+netstat -tulpn | grep 8080
+# Check basic connectivity
+ping minimal-service
+# Analyze NetworkPolicy impact
+iptables-save | grep DROP
+```
+
+#### 4. Using ephemeral containers for process debugging
+
+```bash
+# Add a debug container to check process information
+kubectl debug -n debug-practice $APP_POD -it --image=busybox --target=app
+
+# Inside the debug container:
+# Check running processes
+ps aux
+# Check CPU and memory usage
+top
+# Check for file descriptors
+ls -la /proc/1/fd/
+```
+
+#### 5. Using ephemeral containers for filesystem inspection
+
+```bash
+# Add a debug container to inspect the filesystem
+kubectl debug -n debug-practice $APP_POD -it --image=ubuntu --target=app
+
+# Inside the debug container:
+# Check filesystem usage
+df -h
+# Inspect the container filesystem
+find / -type f -name "*.conf" 2>/dev/null
+# Check mounted volumes
+mount | grep volume
+```
+
+#### 6. Analyzing network policies
+
+```bash
+# Check network policies in the namespace
+kubectl get networkpolicies -n debug-practice
+kubectl describe networkpolicy restrict-traffic -n debug-practice
+
+# Test connectivity from a pod with correct labels
+kubectl run test-pod -n debug-practice --labels="role=monitoring" --image=busybox -- sleep 3600
+kubectl exec -it test-pod -n debug-practice -- wget -q -O- --timeout=2 minimal-service
+
+# Test connectivity from a pod without correct labels
+kubectl run another-test -n debug-practice --image=busybox -- sleep 3600
+kubectl exec -it another-test -n debug-practice -- wget -q -O- --timeout=2 minimal-service
+# This should fail due to the NetworkPolicy
+```
+
+### Remediation
+
+1. Fix the NetworkPolicy to allow proper communication:
+
+```bash
+cat <<EOF > /tmp/fixed-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: restrict-traffic
+  namespace: debug-practice
+spec:
+  podSelector:
+    matchLabels:
+      app: minimal-app
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels: {}
+EOF
+
+kubectl apply -f /tmp/fixed-policy.yaml
+```
+
+2. Identify and terminate the CPU-intensive process:
+
+```bash
+# Add a debug container to identify and stop the process
+kubectl debug -n debug-practice $APP_POD -it --image=busybox --target=app
+
+# Inside the debug container:
+# Find the busy loop process
+ps aux | grep sh
+# Terminate the process
+kill -9 <PID>
+```
+
+3. Update the Service to point to the correct port:
+
+```bash
+kubectl edit service minimal-service -n debug-practice
+# Change targetPort from 8080 to 80
+```
+
+4. Verify fixes:
+
+```bash
+# Check client pod logs to confirm connectivity is restored
+kubectl logs -n debug-practice $CLIENT_POD -f
+
+# Check CPU usage
+kubectl top pod -n debug-practice
+```
+
+### Advanced Debugging Techniques
+
+#### 1. Copying a Pod with Debug Options
+
+```bash
+# Create a copy of the pod with debugging tools
+kubectl debug -n debug-practice $APP_POD --image=ubuntu --share-processes --copy-to=debug-$APP_POD
+
+# This creates a new pod with the same configuration plus debugging tools
+```
+
+#### 2. Node-Level Debugging
+
+```bash
+# Debug at the node level
+NODE=$(kubectl get pod -n debug-practice $APP_POD -o jsonpath='{.spec.nodeName}')
+kubectl debug node/$NODE -it --image=nicolaka/netshoot
+
+# Inside the debug container:
+chroot /host
+# Now you can access the node's filesystem and processes
+```
+
+#### 3. Container Runtime Debugging
+
+```bash
+# Get container ID
+CONTAINER_ID=$(kubectl get pod -n debug-practice $APP_POD -o jsonpath='{.status.containerStatuses[0].containerID}' | sed 's/containerd:\/\///')
+
+# SSH to the node and inspect with crictl
+ssh $NODE
+sudo crictl inspect $CONTAINER_ID
+sudo crictl stats $CONTAINER_ID
+```
+
+### Quick Reference for Ephemeral Container Debugging
+
+| Issue | Debug Container | Key Commands |
+|-------|----------------|-------------|
+| Network | `nicolaka/netshoot` | `netstat -tulpn`, `tcpdump`, `ping`, `curl`, `iptables-save` |
+| Process | `busybox` or `ubuntu` | `ps aux`, `top`, `kill`, `strace` |
+| Filesystem | `ubuntu` | `ls -la`, `find`, `cat`, `df -h` |
+| Memory | `nicolaka/netshoot` | `free -m`, `cat /proc/meminfo`, `smem` |
+| Performance | `nicolaka/netshoot` | `top`, `mpstat`, `iostat`, `vmstat` |
+
+### Do Not Forget (Key Takeaways)
+- ✅ Use `kubectl debug` to add ephemeral containers to running pods
+- ✅ For network debugging, use `nicolaka/netshoot` image 
+- ✅ For process debugging, use `busybox` or `ubuntu` image
+- ✅ Specify target container with `--target=container-name`
+- ✅ For pods based on minimal images, see [Debug Running Pods](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/)
+- ✅ For node-level debugging, try `kubectl debug node/node-name -it --image=ubuntu`
+
+## Appendix: Emergency Commands Reference
+
+This quick reference provides essential commands for common emergency scenarios in the CKA exam:
+
+### Control Plane Recovery
+
+```bash
+# When API server is down, check kubelet
+systemctl status kubelet
+journalctl -u kubelet | tail -50
+
+# Check static pod manifests
+ls -la /etc/kubernetes/manifests/
+
+# Check running containers when kubectl fails
+crictl ps
+crictl logs <container-id>
+
+# Manually restart kubelet
+systemctl restart kubelet
+```
+
+### Certificate Management
+
+```bash
+# Check certificate expiration
+kubeadm certs check-expiration
+
+# Renew all certificates
+kubeadm certs renew all
+
+# Renew specific certificate
+kubeadm certs renew apiserver
+
+# Check certificate details
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout | grep Validity -A2
+```
+
+### ETCD Operations
+
+```bash
+# Backup etcd (API server working)
+ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  snapshot save /tmp/etcd-backup.db
+
+# Check backup status
+ETCDCTL_API=3 etcdctl --write-out=table snapshot status /tmp/etcd-backup.db
+
+# Restore etcd
+ETCDCTL_API=3 etcdctl snapshot restore /tmp/etcd-backup.db --data-dir=/var/lib/etcd-restore
+```
+
+### Debugging Commands
+
+```bash
+# Debug a pod with ephemeral container
+kubectl debug <pod-name> -it --image=busybox --target=<container-name>
+
+# Debug a node directly
+kubectl debug node/<node-name> -it --image=ubuntu
+
+# Check events (sorted by time)
+kubectl get events --sort-by='.lastTimestamp'
+
+# Check pod logs with timestamps
+kubectl logs <pod-name> --timestamps
+```
+
+### NetworkPolicy Testing
+
+```bash
+# Create test pod for connectivity checks
+kubectl run test-pod --image=busybox --rm -it -- wget -qO- <service-name>
+
+# Check if NetworkPolicy is blocking traffic
+kubectl describe networkpolicy <policy-name> -n <namespace>
+
+# Check effective iptables rules (on node)
+iptables-save | grep DROP | grep <pod-ip>
+```
+
+### Storage Debugging
+
+```bash
+# Check PV/PVC status and details
+kubectl get pv,pvc
+kubectl describe pv <pv-name>
+kubectl describe pvc <pvc-name> -n <namespace>
+
+# Check StorageClass details
+kubectl get sc
+kubectl describe sc <storage-class-name>
+
+# Check SELinux context for volume paths (on node)
+ls -Z /path/to/volume
+chcon -Rt svirt_sandbox_file_t /path/to/volume
+
+# For RHEL/AlmaLinux/CentOS systems with SELinux
+# Apply the container file context permanently 
+semanage fcontext -a -t container_file_t '/path/to/volume(/.*)?'
+restorecon -Rv /path/to/volume
+
+# Check storage provisioner logs
+kubectl logs -n <namespace> <provisioner-pod-name>
+```
+
+### Node Management
+
+```bash
+# Drain a node safely
+kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
+
+# Mark node as unschedulable (without eviction)
+kubectl cordon <node-name>
+
+# Mark node as schedulable again
+kubectl uncordon <node-name>
+
+# Check resource usage
+kubectl top nodes
+kubectl top pods -A
+```
+
+### RBAC Verification
+
+```bash
+# Check permissions for your current user
+kubectl auth can-i <verb> <resource>
+
+# Check permissions for another user
+kubectl auth can-i <verb> <resource> --as=<username>
+
+# Check permissions in specific namespace
+kubectl auth can-i <verb> <resource> --namespace=<namespace>
+```
+
+### Last Resort Recovery
+
+```bash
+# If a pod is totally stuck, force delete
+kubectl delete pod <pod-name> --grace-period=0 --force
+
+# If API server is broken beyond repair
+sudo rm /etc/kubernetes/manifests/kube-apiserver.yaml
+sudo cp /path/to/backup/kube-apiserver.yaml /etc/kubernetes/manifests/
+```
+
+For more detailed instructions, refer to the specific scenario that matches your issue.
+
+### Common Diagnostic Steps
+
+To avoid repetition, refer to these standard diagnostic procedures throughout the scenarios:
+
+#### Pod Issues
+
+```bash
+# 1. Check pod status
+kubectl get pods [-n namespace]
+
+# 2. Check pod details - events section is critical
+kubectl describe pod <pod-name> [-n namespace]
+
+# 3. Check container logs
+kubectl logs <pod-name> [-c container-name] [-n namespace]
+# Check previous container (if crashed)
+kubectl logs <pod-name> [-c container-name] --previous [-n namespace]
+```
+
+#### Network Issues
+
+```bash
+# 1. Verify Service exists and has endpoints
+kubectl get endpoints <service-name> [-n namespace]
+
+# 2. Check if pods match Service selector
+kubectl get pods -l <key>=<value> [-n namespace]
+
+# 3. Test connectivity with temporary pod
+kubectl run test --image=busybox [-n namespace] -- sleep 3600
+kubectl exec -it test [-n namespace] -- wget -qO- <service-name>
+
+# 4. Check NetworkPolicies
+kubectl get networkpolicies [-n namespace]
+```
+
+#### Node Issues
+
+```bash
+# 1. Check node status
+kubectl get nodes
+kubectl describe node <node-name>
+
+# 2. Verify kubelet is running on the node
+ssh <node-name> "systemctl status kubelet"
+
+# 3. Check kubelet logs
+ssh <node-name> "journalctl -u kubelet | tail -50"
+```
+
+For more details on specific issues, refer to the relevant scenario.
+
+# CKA Exam Quick Start
+
+1. Set up useful aliases:
+   ```bash
+   alias k=kubectl
+   export do="--dry-run=client -o yaml"
+   export now="--force --grace-period 0"
+   ```
+
+2. Enable tab completion:
+   ```bash
+   source <(kubectl completion bash)
+   complete -F __start_kubectl k
+   ```
+
+3. Bookmark key documentation pages:
+   - https://kubernetes.io/docs/reference/kubectl/cheatsheet/
+   - https://kubernetes.io/docs/tasks/debug/
+   - https://kubernetes.io/docs/tasks/administer-cluster/
+
+Good luck on your CKA exam!
+
+End of Document.
 
 For additional information and reference during CKA exam preparation, the following official Kubernetes documentation links can be valuable:
 
@@ -133,6 +720,53 @@ For additional information and reference during CKA exam preparation, the follow
 10. [Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)
 
 Remember that during the CKA exam, you'll have access to the official Kubernetes documentation. Familiarize yourself with navigating these resources efficiently to save time during the exam.
+
+## Cluster State Visualization
+
+The following diagram illustrates a typical Kubernetes cluster and the components covered in these scenarios:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                          KUBERNETES CLUSTER                             │
+│                                                                         │
+│  ┌─────────────────────────────┐      ┌───────────────────────────────┐ │
+│  │ CONTROL PLANE NODE(S)       │      │ WORKER NODES                  │ │
+│  │                             │      │                               │ │
+│  │  ┌─────────────────────┐    │      │  ┌─────────────────────────┐  │ │
+│  │  │ Control Plane Pods  │    │      │  │ Application Workloads   │  │ │
+│  │  │                     │    │      │  │                         │  │ │
+│  │  │ ┌─────────────────┐ │    │      │  │ ┌─────────────────────┐ │  │ │
+│  │  │ │ kube-apiserver  │ │    │      │  │ │ Pods               │ │  │ │
+│  │  │ └─────────────────┘ │    │      │  │ └─────────────────────┘ │  │ │
+│  │  │ ┌─────────────────┐ │    │      │  │ ┌─────────────────────┐ │  │ │
+│  │  │ │ kube-scheduler  │ │    │      │  │ │ Deployments         │ │  │ │
+│  │  │ └─────────────────┘ │    │      │  │ └─────────────────────┘ │  │ │
+│  │  │ ┌─────────────────┐ │    │      │  │ ┌─────────────────────┐ │  │ │
+│  │  │ │ kube-controller │ │    │      │  │ │ Services            │ │  │ │
+│  │  │ └─────────────────┘ │    │      │  │ └─────────────────────┘ │  │ │
+│  │  │ ┌─────────────────┐ │    │      │  │ ┌─────────────────────┐ │  │ │
+│  │  │ │ etcd            │ │    │      │  │ │ Storage             │ │  │ │
+│  │  │ └─────────────────┘ │    │      │  │ └─────────────────────┘ │  │ │
+│  │  └─────────────────────┘    │      │  └─────────────────────────┘  │ │
+│  │                             │      │                               │ │
+│  │  ┌─────────────────────┐    │      │  ┌─────────────────────────┐  │ │
+│  │  │ Node Components     │    │      │  │ Node Components         │  │ │
+│  │  │                     │    │      │  │                         │  │ │
+│  │  │ ┌─────────────────┐ │    │      │  │ ┌─────────────────────┐ │  │ │
+│  │  │ │ kubelet         │ │    │      │  │ │ kubelet             │ │  │ │
+│  │  │ └─────────────────┘ │    │      │  │ └─────────────────────┘ │  │ │
+│  │  │ ┌─────────────────┐ │    │      │  │ ┌─────────────────────┐ │  │ │
+│  │  │ │ containerd      │ │    │      │  │ │ containerd          │ │  │ │
+│  │  │ └─────────────────┘ │    │      │  │ └─────────────────────┘ │  │ │
+│  │  │ ┌─────────────────┐ │    │      │  │ ┌─────────────────────┐ │  │ │
+│  │  │ │ kube-proxy      │ │    │      │  │ │ kube-proxy          │ │  │ │
+│  │  │ └─────────────────┘ │    │      │  │ └─────────────────────┘ │  │ │
+│  │  └─────────────────────┘    │      │  └─────────────────────────┘  │ │
+│  │                             │      │                               │ │
+│  └─────────────────────────────┘      └───────────────────────────────┘ │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Time Management Tips
 
@@ -163,6 +797,57 @@ Each scenario in this document is designed to take approximately 15-20 minutes, 
 14. [Admission Controllers and Pod Security](#scenario-14-admission-controllers-and-pod-security-standards)
 15. [Combined Mock Exam Scenario](#scenario-15-combined-mock-exam-scenario)
 16. [Dynamic Storage Provisioning with CSI Drivers](#scenario-16-dynamic-storage-provisioning-with-csi-drivers)
+17. [Advanced Debugging with Ephemeral Containers](#scenario-17-advanced-debugging-with-ephemeral-containers)
+
+## Common Troubleshooting Patterns
+
+Before diving into specific scenarios, here are fundamental troubleshooting patterns that apply across multiple Kubernetes issues:
+
+### 1. The Kubernetes Troubleshooting Workflow
+
+```
+┌────────────────┐     ┌────────────────┐     ┌────────────────┐     ┌────────────────┐
+│  1. OBSERVE    │────>│  2. DIAGNOSE   │────>│  3. REMEDIATE  │────>│  4. VALIDATE   │
+└────────────────┘     └────────────────┘     └────────────────┘     └────────────────┘
+    - Get status         - Check logs           - Edit configs         - Check status
+    - List resources     - Describe objects     - Restart services     - Test functionality
+    - Check events       - Inspect configs      - Scale/recreate       - Monitor logs
+```
+
+### 2. Resource-Specific Troubleshooting Commands
+
+| Resource Type | Observation | Diagnosis | Common Issues |
+|---------------|-------------|-----------|---------------|
+| **Nodes** | `kubectl get nodes` | `kubectl describe node <name>` <br> `kubectl top node` | NotReady status, kubelet issues, resource pressure |
+| **Pods** | `kubectl get pods -o wide` | `kubectl describe pod <name>` <br> `kubectl logs <pod>` | CrashLoopBackOff, ImagePullBackOff, Pending status |
+| **Services** | `kubectl get svc` | `kubectl describe svc <name>` <br> `kubectl get endpoints <name>` | No endpoints, selector issues, port mismatches |
+| **Deployments** | `kubectl get deploy` | `kubectl describe deploy <name>` <br> `kubectl rollout status deploy <name>` | Unavailable replicas, failed conditions, strategy issues |
+| **Storage** | `kubectl get pv,pvc` | `kubectl describe pv/pvc <name>` | Pending binding, access mode mismatches, wrong storage class |
+| **Networking** | `kubectl get netpol` | `kubectl describe netpol <name>` | Overly restrictive policies, ingress/egress rules |
+
+### 3. Log Location Reference
+
+| Component | Log Location | Command |
+|-----------|-------------|---------|
+| kubelet | `/var/log/kubelet.log` | `journalctl -u kubelet` |
+| API Server | container logs | `kubectl logs -n kube-system kube-apiserver-<master>` |
+| Controller Manager | container logs | `kubectl logs -n kube-system kube-controller-manager-<master>` |
+| Scheduler | container logs | `kubectl logs -n kube-system kube-scheduler-<master>` |
+| etcd | container logs | `kubectl logs -n kube-system etcd-<master>` |
+| Container Runtime | varies | `journalctl -u containerd` or `crictl logs` |
+| System | `/var/log/syslog` or `/var/log/messages` | `journalctl` |
+
+### 4. Critical Configuration Files
+
+| Component | Config Location | Purpose |
+|-----------|-----------------|---------|
+| kubelet | `/var/lib/kubelet/config.yaml` | Kubelet configuration |
+| kubeadm | `/etc/kubernetes/admin.conf` | Cluster admin configuration |
+| API Server | `/etc/kubernetes/manifests/kube-apiserver.yaml` | Static pod manifest |
+| Controller Manager | `/etc/kubernetes/manifests/kube-controller-manager.yaml` | Static pod manifest |
+| Scheduler | `/etc/kubernetes/manifests/kube-scheduler.yaml` | Static pod manifest |
+| etcd | `/etc/kubernetes/manifests/etcd.yaml` | Static pod manifest |
+| PKI | `/etc/kubernetes/pki/` | Certificate files |
 
 ## Document Purpose and Curriculum Mapping
 
@@ -337,6 +1022,13 @@ sudo mkdir -p /etc/kubernetes/broken-certs/
    watch -n1 kubectl get nodes
    ```
 
+### Do Not Forget (Key Takeaways)
+- ✅ API Server issues often involve manifest errors or certificate problems
+- ✅ Check kubelet logs first when the API Server is down (`journalctl -u kubelet`)
+- ✅ API Server manifest is at `/etc/kubernetes/manifests/kube-apiserver.yaml`
+- ✅ Always check resource usage with `kubectl top nodes` if scheduling seems stuck
+- ✅ Use `crictl` commands when `kubectl` doesn't work due to API Server issues
+
 ## Scenario 2: Networking, Services, and DNS Troubleshooting
 
 ### Key Learning Objectives
@@ -413,6 +1105,13 @@ kubectl delete pod -l k8s-app=kube-dns -n kube-system --limit=1
    kubectl exec -it busybox -- nslookup kubernetes.default
    kubectl exec -it busybox -- nslookup google.com
    ```
+
+### Do Not Forget (Key Takeaways)
+- ✅ DNS issues often involve CoreDNS ConfigMap errors or pod failures
+- ✅ Always check DNS resolution from inside a test pod (`kubectl exec -it <pod> -- nslookup kubernetes.default`)
+- ✅ Verify CoreDNS pods are running (`kubectl get pods -n kube-system -l k8s-app=kube-dns`)
+- ✅ Check pod DNS configuration in `/etc/resolv.conf` for correct nameserver
+- ✅ For DNS troubleshooting, see [Debugging DNS Resolution](https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/)
 
 ## Scenario 3: Cluster Node Failure and Recovery
 
@@ -491,6 +1190,13 @@ sudo systemctl restart kubelet
    kubectl get nodes
    # worker1 should show as Ready
    ```
+
+### Do Not Forget (Key Takeaways)
+- ✅ Node NotReady state is often caused by kubelet configuration issues
+- ✅ Always check kubelet status first (`systemctl status kubelet`)
+- ✅ For persistent node failures, safely drain the node (`kubectl drain <node> --ignore-daemonsets`)
+- ✅ For nodes that won't recover, remove them from the cluster (`kubectl delete node <node>`)
+- ✅ If you see pods stuck on a failed node, see [Force Delete Pods](https://kubernetes.io/docs/tasks/run-application/force-delete-stateful-set-pod/)
 
 ## Scenario 4: ETCD Backup and Restore
 
@@ -587,6 +1293,13 @@ kubectl delete namespace recovery-test
    kubectl get service -n recovery-test
    kubectl get pods -n recovery-test
    ```
+
+### Do Not Forget (Key Takeaways)
+- ✅ Always back up etcd before making cluster changes (`etcdctl snapshot save`)
+- ✅ Verify backup integrity (`etcdctl snapshot status`)
+- ✅ Stop API server before restoring etcd (move manifests out of `/etc/kubernetes/manifests/`)
+- ✅ After restore, ensure proper ownership (`chown -R etcd:etcd /var/lib/etcd`)
+- ✅ For detailed etcd operations, see [Operating etcd clusters](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
 
 ## Scenario 5: Multi-Container Pod Troubleshooting and Resource Management
 
@@ -730,6 +1443,13 @@ kubectl apply -f /tmp/problematic-pod.yaml
    kubectl logs app-with-sidecar -c sidecar-container
    kubectl logs app-with-sidecar -c app-container
    ```
+
+### Do Not Forget (Key Takeaways)
+- ✅ Check pod status with `kubectl describe pod` to see specific container issues
+- ✅ Review container logs for each container (`kubectl logs pod-name -c container-name`)
+- ✅ For CrashLoopBackOff, check the previous container logs (`kubectl logs pod-name -c container-name --previous`)
+- ✅ Verify resource constraints with `kubectl top pods` and compare to limits/requests
+- ✅ For advanced container debugging, see [Scenario 17: Advanced Debugging with Ephemeral Containers](#scenario-17-advanced-debugging-with-ephemeral-containers)
 
 ## Scenario 6: RBAC, Authentication, and Authorization
 
@@ -913,6 +1633,13 @@ EOF
    kubectl --kubeconfig=/tmp/developer.kubeconfig get deployments
    ```
 
+### Do Not Forget (Key Takeaways)
+- ✅ Verify permissions with `kubectl auth can-i` before creating resources
+- ✅ Understand the difference between Role (namespace) and ClusterRole (cluster-wide)
+- ✅ Check Role and RoleBinding are in the same namespace
+- ✅ The `roleRef` in RoleBinding must point to a valid Role/ClusterRole
+- ✅ For comprehensive RBAC guidance, see [Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
+
 ## Scenario 7: Cluster Upgrade and Component Failure
 
 ### Problem Statement
@@ -1011,6 +1738,14 @@ ssh k8s-master "sudo mv /etc/systemd/system/kubelet.service.d/10-kubeadm.conf /e
    kubectl get service important-app
    kubectl get pods -l app=important-app
    ```
+
+### Do Not Forget (Key Takeaways)
+- ✅ Always run `kubeadm upgrade plan` before upgrading
+- ✅ Upgrade control plane components before worker nodes
+- ✅ Drain nodes before upgrading to prevent workload disruption
+- ✅ Uncordon nodes after upgrade to resume scheduling
+- ✅ Version skew between components should be no more than -1/+1 (for example, if API server is v1.32, kubelet can be v1.31-v1.32)
+- ✅ For upgrade guidance, see [Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)
 
 ## Scenario 8: Persistent Volume and Storage Troubleshooting
 
@@ -1384,6 +2119,13 @@ kubectl apply -f /tmp/restrictive-policy.yaml
    kubectl get networkpolicymetrics -n backend
    ```
 
+### Do Not Forget (Key Takeaways)
+- ✅ NetworkPolicies are namespace-scoped and use labels for selection
+- ✅ Default behavior without NetworkPolicies allows all traffic
+- ✅ Test connectivity with temporary pods: `kubectl run test --image=busybox -- sleep 3600`
+- ✅ Use ephemeral debug containers for network diagnostics (see [Scenario 17](#scenario-17-advanced-debugging-with-ephemeral-containers))
+- ✅ For comprehensive NetworkPolicy design, see [Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+
 ## Scenario 10: Advanced Scheduling with Taints, Tolerations, and Affinities
 
 ### Key Learning Objectives
@@ -1610,6 +2352,13 @@ kubectl apply -f /tmp/regular-app.yaml
    # Pods should be distributed across worker1 and worker2 for HA
    ```
 
+### Do Not Forget (Key Takeaways)
+- ✅ HA etcd clusters need an odd number of members (3, 5, 7) for quorum
+- ✅ Quorum = (n/2)+1 where n is cluster size (3 members = 2 quorum)
+- ✅ To remove a failed member, use `etcdctl member remove <ID>`
+- ✅ To add a new member, use `etcdctl member add <name> --peer-urls=<url>`
+- ✅ For etcd cluster operations, see [Operating etcd clusters](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+
 ## Scenario 13: Certificate Rotation and TLS Troubleshooting
 
 ### Problem Statement
@@ -1695,6 +2444,13 @@ ssh worker1 "sudo systemctl restart kubelet"
    # Certificates should appear in the auto rotation list
    ssh worker1 "sudo kubeadm certs check-expiration | grep kubelet-client"
    ```
+
+### Do Not Forget (Key Takeaways)
+- ✅ Check certificate expiration with `kubeadm certs check-expiration`
+- ✅ Renew certificates with `kubeadm certs renew <component>`
+- ✅ Verify certificate dates with `openssl x509 -in cert.pem -text -noout | grep Validity`
+- ✅ Kubelet requires valid client certificates to communicate with API server
+- ✅ For certificate management, see [Certificate Management with kubeadm](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/)
 
 ## Scenario 14: Admission Controllers and Pod Security Standards
 
@@ -1851,6 +2607,13 @@ kubectl apply -f /tmp/privileged-pod.yaml
    See full documentation at: https://kubernetes.io/docs/concepts/security/pod-security-standards/
    EOF
    ```
+
+### Do Not Forget (Key Takeaways)
+- ✅ Pod Security Standards have three levels: Privileged, Baseline, and Restricted
+- ✅ Admission controllers validate resources before they're persisted to etcd
+- ✅ If pods are rejected, check events with `kubectl get events` for details
+- ✅ Use `kubectl describe namespace` to check Pod Security level labels
+- ✅ For security compliance, see [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
 
 ## Scenario 15: Combined Mock Exam Scenario
 
@@ -2173,6 +2936,14 @@ During the actual CKA exam, when facing multiple issues:
 4. Address application-specific problems (resource conflicts, storage issues)
 5. Always verify fixes before moving to the next issue
 
+### Do Not Forget (Key Takeaways)
+- ✅ Always prioritize control plane issues before application problems
+- ✅ Use a methodical approach: check node status → check pods → check services
+- ✅ For complex issues, break them down into smaller, manageable problems
+- ✅ Verify each fix before moving to the next issue
+- ✅ Time management is critical, focus on high-point questions first in the real exam
+- ✅ For real-world complex issues, see [Troubleshooting Clusters](https://kubernetes.io/docs/tasks/debug/debug-cluster/)
+
 ## Scenario 16: Dynamic Storage Provisioning with CSI Drivers
 
 ### Key Learning Objectives
@@ -2362,6 +3133,13 @@ When troubleshooting storage problems in Kubernetes, remember to check OS-level 
    
    # For a permanent fix, create the correct SELinux context
    ssh worker1 sudo chcon -Rt svirt_sandbox_file_t /mnt/data
+   
+   # For RHEL/AlmaLinux environments, check contexts more thoroughly
+   ssh worker1 "sudo ls -lZ /mnt/data"
+   
+   # Apply the container file context policy
+   ssh worker1 "sudo semanage fcontext -a -t container_file_t '/mnt/data(/.*)?'"
+   ssh worker1 "sudo restorecon -Rv /mnt/data"
    ```
 
 2. **Directory permissions**:
