@@ -2,7 +2,7 @@
 # Certified Kubernetes Administrator (CKA) Exam Preparation Scenarios
 # Based on Kubernetes 1.32 Features
 
-Below is a **fully expanded** set of scenarios **with no hidden sections**, covering **all 10** recommended scenarios in detail.
+Below is a set of scenarios covering recommended scenarios in detail.
 
 ## Table of Contents
 1. [Lab Setup & Prerequisites](#lab-setup--prerequisites)
