@@ -1,9 +1,7 @@
 # Kezie Iroha 
-# Certified Kubernetes Administrator (CKA) Exam Preparation Scenarios
-# Based on Kubernetes 1.32 Features
-# Part 1
+## Certified Kubernetes Administrator (CKA) Exam Preparation Scenarios part 1 (k8 1.32)
+## If you find my notes useful for your study, then hit the star ⭐️
 
-Comprehensive set of scenarios specifically designed to align with the current CKA curriculum and K8s 1.32 features.
 
 ## Table of Contents
 1. [Cluster Configuration and API Server Failure](#scenario-1-cluster-configuration-and-api-server-failure)

@@ -1,4 +1,6 @@
+# Kezie Iroha 
 # Kubernetes CKA Lab Environment
+## If you find my notes useful for your study, then hit the star ⭐️
 
 This is my local Kubernetes environment built with Vagrant and VMware for Certified Kubernetes Administrator (CKA) exam preparation.
 
