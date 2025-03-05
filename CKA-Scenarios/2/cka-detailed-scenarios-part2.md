@@ -4,7 +4,6 @@
 ## If you find my notes useful for your study, then hit the star ⭐️
 
 
-
 ## Table of Contents
 1. [Lab Setup & Prerequisites](#lab-setup--prerequisites)
 2. [Scenario 1: Control Plane Component Failure](#scenario-1-control-plane-component-failure)
