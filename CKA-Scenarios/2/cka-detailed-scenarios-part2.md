@@ -1,8 +1,5 @@
 # Kezie Iroha 
-# Kezie Iroha 
 ## Certified Kubernetes Administrator (CKA) Exam Preparation Scenarios part 2 (k8 1.32)
-## If you find my notes useful for your study, then hit the star ⭐️
-
 
 ## Table of Contents
 1. [Lab Setup & Prerequisites](#lab-setup--prerequisites)
