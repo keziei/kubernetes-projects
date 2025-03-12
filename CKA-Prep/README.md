@@ -3,9 +3,6 @@
 
 This is my personal repository containing study materials, lab configurations, and practice scenarios for the Certified Kubernetes Administrator (CKA) exam preparation.
 
-## Purpose
-I'm sharing this resource publicly in case it can help others on a similar path.
-
 ## What's Included
 
 - Detailed practice scenarios covering all CKA exam domains
@@ -22,9 +19,9 @@ The lab environments are configured for:
 - containerd runtime
 - Various networking solutions (Flannel, Calico)
 
-## Feel Free to Use and Share
+## Permission
 
-While these are my personal study materials, I'm happy to share them with anyone who finds them useful. If you're also preparing for the CKA exam or learning Kubernetes, feel free to:
+If you're also preparing for the CKA exam or learning Kubernetes, feel free to:
 
 - Clone the repository
 - Adapt the lab configurations to your environment
